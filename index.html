@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>PassportSnap</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --ink:    #0f0e0d;
+    --paper:  #f5f0e8;
+    --cream:  #ede7d9;
+    --stamp:  #c0392b;
+    --gold:   #b8962e;
+    --mid:    #7a7060;
+    --border: #cfc8b8;
+  }
+
+  html, body {
+    height: 100%;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: 'DM Mono', monospace;
+  }
+
+  /* ── grain overlay ── */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none; z-index: 9999;
+  }
+
+  /* ── layout ── */
+  .page {
+    max-width: 820px;
+    margin: 0 auto;
+    padding: 48px 32px 80px;
+  }
+
+  /* ── header ── */
+  header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 16px;
+    margin-bottom: 48px;
+  }
+  .logo {
+    font-family: 'DM Serif Display', serif;
+    font-size: 2rem;
+    letter-spacing: -0.02em;
+    line-height: 1;
+  }
+  .logo span { color: var(--stamp); font-style: italic; }
+  .tagline {
+    font-size: 0.68rem;
+    color: var(--mid);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  /* ── step labels ── */
+  .step-label {
+    font-size: 0.62rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--mid);
+    margin-bottom: 10px;
+  }
+  .step-label b { color: var(--stamp); }
+
+  /* ── upload zone ── */
+  #upload-zone {
+    border: 2px dashed var(--border);
+    border-radius: 4px;
+    background: var(--cream);
+    padding: 56px 32px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    position: relative;
+  }
+  #upload-zone.drag-over {
+    border-color: var(--stamp);
+    background: #f9f0ee;
+  }
+  #upload-zone input[type=file] {
+    position: absolute; inset: 0; opacity: 0; cursor: pointer;
+  }
+  .upload-icon {
+    font-size: 2.6rem;
+    margin-bottom: 12px;
+    display: block;
+  }
+  .upload-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 1.3rem;
+    margin-bottom: 6px;
+  }
+  .upload-sub { font-size: 0.72rem; color: var(--mid); }
+
+  /* ── editor section ── */
+  #editor-section {
+    display: none;
+    margin-top: 48px;
+    animation: fadeUp 0.4s ease both;
+  }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .editor-grid {
+    display: grid;
+    grid-template-columns: 1fr 220px;
+    gap: 32px;
+    align-items: start;
+  }
+
+  /* ── canvas wrapper ── */
+  .canvas-wrap {
+    position: relative;
+    background: #333;
+    border-radius: 4px;
+    overflow: hidden;
+    cursor: grab;
+    user-select: none;
+    touch-action: none;
+  }
+  .canvas-wrap:active { cursor: grabbing; }
+  #editor-canvas { display: block; width: 100%; }
+
+  /* overlay frame lines */
+  .canvas-wrap::after {
+    content: '';
+    position: absolute; inset: 0;
+    pointer-events: none;
+    box-shadow: inset 0 0 0 2px rgba(255,255,255,0.25);
+    border-radius: 4px;
+  }
+
+  /* ── controls sidebar ── */
+  .sidebar { display: flex; flex-direction: column; gap: 20px; }
+
+  .ctrl-box {
+    background: var(--cream);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 16px;
+  }
+  .ctrl-box h3 {
+    font-size: 0.62rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--mid);
+    margin-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 8px;
+  }
+
+  /* preview */
+  #preview-canvas {
+    display: block;
+    width: 100%;
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    background: #fff;
+  }
+  .preview-dims {
+    font-size: 0.62rem;
+    color: var(--mid);
+    text-align: center;
+    margin-top: 6px;
+  }
+
+  /* zoom slider */
+  .slider-row { display: flex; align-items: center; gap: 8px; }
+  .slider-row label { font-size: 0.68rem; color: var(--mid); white-space: nowrap; }
+  input[type=range] {
+    flex: 1;
+    accent-color: var(--stamp);
+    cursor: pointer;
+  }
+
+  /* reset btn */
+  .btn-ghost {
+    width: 100%;
+    padding: 8px;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    cursor: pointer;
+    color: var(--mid);
+    transition: border-color 0.15s, color 0.15s;
+  }
+  .btn-ghost:hover { border-color: var(--ink); color: var(--ink); }
+
+  /* ── download section ── */
+  #download-section {
+    display: none;
+    margin-top: 32px;
+    animation: fadeUp 0.35s ease both;
+  }
+  .download-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 10px;
+  }
+  .btn-dl {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 18px 12px;
+    border: 2px solid var(--ink);
+    border-radius: 4px;
+    background: var(--cream);
+    cursor: pointer;
+    font-family: 'DM Mono', monospace;
+    transition: background 0.15s, transform 0.1s;
+    text-decoration: none;
+    color: var(--ink);
+  }
+  .btn-dl:hover { background: var(--ink); color: var(--paper); }
+  .btn-dl .dl-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 1rem;
+    margin-bottom: 2px;
+  }
+  .btn-dl .dl-sub { font-size: 0.62rem; color: inherit; opacity: 0.6; }
+
+  .btn-primary {
+    grid-column: 1 / -1;
+    background: var(--stamp);
+    border-color: var(--stamp);
+    color: #fff;
+  }
+  .btn-primary:hover { background: #a93226; border-color: #a93226; color: #fff; }
+
+  /* ── print sheet ── */
+  #print-section {
+    display: none;
+    margin-top: 32px;
+    animation: fadeUp 0.35s ease both;
+  }
+  #sheet-canvas {
+    display: block;
+    max-width: 100%;
+    border: 1px solid var(--border);
+    margin-top: 10px;
+  }
+
+  /* ── tip bar ── */
+  .tip {
+    margin-top: 40px;
+    padding: 14px 18px;
+    border-left: 3px solid var(--gold);
+    background: var(--cream);
+    font-size: 0.7rem;
+    color: var(--mid);
+    line-height: 1.7;
+  }
+  .tip strong { color: var(--ink); }
+
+  /* ── footer ── */
+  footer {
+    margin-top: 60px;
+    border-top: 1px solid var(--border);
+    padding-top: 16px;
+    font-size: 0.62rem;
+    color: var(--mid);
+    display: flex;
+    justify-content: space-between;
+  }
+
+  /* ── responsive ── */
+  @media (max-width: 600px) {
+    .editor-grid { grid-template-columns: 1fr; }
+    .download-grid { grid-template-columns: 1fr; }
+    .btn-primary { grid-column: auto; }
+    header { flex-direction: column; gap: 6px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header>
+    <div class="logo">Passport<span>Snap</span></div>
+    <div class="tagline">US Standard · 2 × 2 in · Free · Private</div>
+  </header>
+
+  <!-- STEP 1: Upload -->
+  <div class="step-label"><b>01</b> &nbsp;Upload your photo</div>
+  <div id="upload-zone">
+    <input type="file" id="file-input" accept="image/*" />
+    <span class="upload-icon">📷</span>
+    <div class="upload-title">Drop a photo here</div>
+    <div class="upload-sub">or click to browse &nbsp;·&nbsp; JPG, PNG, WEBP</div>
+  </div>
+
+  <!-- STEP 2: Editor -->
+  <div id="editor-section">
+    <div class="step-label" style="margin-bottom:16px"><b>02</b> &nbsp;Drag to reposition · scroll / pinch to zoom</div>
+    <div class="editor-grid">
+      <div>
+        <div class="canvas-wrap" id="canvas-wrap">
+          <canvas id="editor-canvas"></canvas>
+        </div>
+      </div>
+      <div class="sidebar">
+        <div class="ctrl-box">
+          <h3>Live Preview</h3>
+          <canvas id="preview-canvas"></canvas>
+          <div class="preview-dims">600 × 600 px &nbsp;(2 × 2 in)</div>
+        </div>
+        <div class="ctrl-box">
+          <h3>Zoom</h3>
+          <div class="slider-row">
+            <label>−</label>
+            <input type="range" id="zoom-slider" min="50" max="300" value="100" step="1" />
+            <label>+</label>
+          </div>
+        </div>
+        <div class="ctrl-box">
+          <h3>Actions</h3>
+          <button class="btn-ghost" id="reset-btn">↺ &nbsp;Reset crop</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 3: Download -->
+  <div id="download-section">
+    <div class="step-label"><b>03</b> &nbsp;Download</div>
+    <div class="download-grid">
+      <button class="btn-dl btn-primary" id="dl-single">
+        <span class="dl-title">Download Photo</span>
+        <span class="dl-sub">600 × 600 px · PNG</span>
+      </button>
+      <button class="btn-dl" id="dl-sheet">
+        <span class="dl-title">Print Sheet</span>
+        <span class="dl-sub">4 × 6 in · 8 photos</span>
+      </button>
+      <button class="btn-dl" id="dl-sheet-dl" style="display:none">
+        <span class="dl-title">↓ Save Sheet</span>
+        <span class="dl-sub">1800 × 1200 px · PNG</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- STEP 4: Print sheet preview -->
+  <div id="print-section">
+    <div class="step-label"><b>04</b> &nbsp;Print sheet preview — 8 photos on 4 × 6 in</div>
+    <canvas id="sheet-canvas"></canvas>
+  </div>
+
+  <div class="tip">
+    <strong>Printing tip:</strong> When printing, set your printer to <strong>4 × 6 in</strong> photo paper and choose <em>"actual size"</em> (no scaling). Each photo will come out exactly 2 × 2 inches as required by the US State Department.
+  </div>
+
+  <footer>
+    <span>PassportSnap · runs entirely in your browser · no data uploaded</span>
+    <span>US 2×2 in standard</span>
+  </footer>
+
+</div>
+
+<script>
+(() => {
+  // ── constants ──────────────────────────────────────────────
+  const PASSPORT_PX = 600;          // output resolution
+  const DISPLAY_SIZE = 480;         // editor canvas display px
+  const PREVIEW_SIZE = 160;         // preview canvas px
+  // print sheet: 4×6 in @ 300dpi = 1200×1800
+  const SHEET_W = 1200, SHEET_H = 1800;
+  const COLS = 2, ROWS = 4;
+  const MARGIN = 30;                // px inside sheet
+  const GAP = 20;
+
+  // ── state ──────────────────────────────────────────────────
+  let img = null;
+  let drag = false;
+  let dragStart = { x: 0, y: 0 };
+  let offset = { x: 0, y: 0 };     // photo offset from centre
+  let scale = 1;                    // zoom multiplier
+  let baseScale = 1;                // scale so photo fills box at 1×
+
+  // ── elements ──────────────────────────────────────────────
+  const uploadZone    = document.getElementById('upload-zone');
+  const fileInput     = document.getElementById('file-input');
+  const editorSection = document.getElementById('editor-section');
+  const downloadSect  = document.getElementById('download-section');
+  const printSection  = document.getElementById('print-section');
+  const editorCanvas  = document.getElementById('editor-canvas');
+  const previewCanvas = document.getElementById('preview-canvas');
+  const sheetCanvas   = document.getElementById('sheet-canvas');
+  const zoomSlider    = document.getElementById('zoom-slider');
+  const resetBtn      = document.getElementById('reset-btn');
+  const dlSingle      = document.getElementById('dl-single');
+  const dlSheet       = document.getElementById('dl-sheet');
+  const dlSheetDl     = document.getElementById('dl-sheet-dl');
+  const canvasWrap    = document.getElementById('canvas-wrap');
+
+  const eCtx  = editorCanvas.getContext('2d');
+  const pCtx  = previewCanvas.getContext('2d');
+  const sCtx  = sheetCanvas.getContext('2d');
+
+  // set canvas dimensions
+  editorCanvas.width  = DISPLAY_SIZE;
+  editorCanvas.height = DISPLAY_SIZE;
+  previewCanvas.width  = PREVIEW_SIZE;
+  previewCanvas.height = PREVIEW_SIZE;
+
+  // ── drag-and-drop on upload zone ───────────────────────────
+  uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('drag-over'); });
+  uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag-over'));
+  uploadZone.addEventListener('drop', e => {
+    e.preventDefault();
+    uploadZone.classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file) loadImage(file);
+  });
+  fileInput.addEventListener('change', () => { if (fileInput.files[0]) loadImage(fileInput.files[0]); });
+
+  function loadImage(file) {
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const i = new Image();
+      i.onload = () => {
+        img = i;
+        baseScale = Math.max(DISPLAY_SIZE / img.width, DISPLAY_SIZE / img.height);
+        scale = 1;
+        offset = { x: 0, y: 0 };
+        zoomSlider.value = 100;
+        editorSection.style.display  = 'block';
+        downloadSect.style.display   = 'block';
+        printSection.style.display   = 'none';
+        dlSheetDl.style.display      = 'none';
+        draw();
+        editorSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      };
+      i.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  // ── drawing ────────────────────────────────────────────────
+  function draw() {
+    if (!img) return;
+
+    const s = baseScale * scale;
+    const iw = img.width  * s;
+    const ih = img.height * s;
+    const cx = DISPLAY_SIZE / 2 + offset.x;
+    const cy = DISPLAY_SIZE / 2 + offset.y;
+
+    // editor canvas
+    eCtx.clearRect(0, 0, DISPLAY_SIZE, DISPLAY_SIZE);
+    eCtx.fillStyle = '#fff';
+    eCtx.fillRect(0, 0, DISPLAY_SIZE, DISPLAY_SIZE);
+    eCtx.drawImage(img, cx - iw/2, cy - ih/2, iw, ih);
+
+    // dim outside (no hard crop in editor, just darken edges slightly)
+    eCtx.fillStyle = 'rgba(0,0,0,0.18)';
+    // top
+    eCtx.fillRect(0, 0, DISPLAY_SIZE, 0);
+    // just a thin vignette ring
+    const grad = eCtx.createRadialGradient(
+      DISPLAY_SIZE/2, DISPLAY_SIZE/2, DISPLAY_SIZE * 0.35,
+      DISPLAY_SIZE/2, DISPLAY_SIZE/2, DISPLAY_SIZE * 0.72
+    );
+    grad.addColorStop(0, 'rgba(0,0,0,0)');
+    grad.addColorStop(1, 'rgba(0,0,0,0.3)');
+    eCtx.fillStyle = grad;
+    eCtx.fillRect(0, 0, DISPLAY_SIZE, DISPLAY_SIZE);
+
+    // crosshair guides
+    eCtx.setLineDash([4, 4]);
+    eCtx.strokeStyle = 'rgba(255,255,255,0.55)';
+    eCtx.lineWidth = 1;
+    eCtx.beginPath();
+    eCtx.moveTo(DISPLAY_SIZE/2, 0); eCtx.lineTo(DISPLAY_SIZE/2, DISPLAY_SIZE);
+    eCtx.moveTo(0, DISPLAY_SIZE/2); eCtx.lineTo(DISPLAY_SIZE, DISPLAY_SIZE/2);
+    eCtx.stroke();
+    eCtx.setLineDash([]);
+
+    drawPreview();
+  }
+
+  function drawPreview() {
+    if (!img) return;
+    const s = baseScale * scale;
+    const iw = img.width  * s;
+    const ih = img.height * s;
+    const cx = DISPLAY_SIZE / 2 + offset.x;
+    const cy = DISPLAY_SIZE / 2 + offset.y;
+    const ratio = PREVIEW_SIZE / DISPLAY_SIZE;
+
+    pCtx.fillStyle = '#fff';
+    pCtx.fillRect(0, 0, PREVIEW_SIZE, PREVIEW_SIZE);
+    pCtx.drawImage(img,
+      (cx - iw/2) * ratio, (cy - ih/2) * ratio,
+      iw * ratio, ih * ratio
+    );
+  }
+
+  // ── get final passport canvas (PASSPORT_PX × PASSPORT_PX) ─
+  function getFinalCanvas() {
+    const out = document.createElement('canvas');
+    out.width = out.height = PASSPORT_PX;
+    const ctx = out.getContext('2d');
+    const s = baseScale * scale;
+    const iw = img.width  * s;
+    const ih = img.height * s;
+    const cx = DISPLAY_SIZE / 2 + offset.x;
+    const cy = DISPLAY_SIZE / 2 + offset.y;
+    const ratio = PASSPORT_PX / DISPLAY_SIZE;
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, PASSPORT_PX, PASSPORT_PX);
+    ctx.drawImage(img,
+      (cx - iw/2) * ratio, (cy - ih/2) * ratio,
+      iw * ratio, ih * ratio
+    );
+    return out;
+  }
+
+  // ── drag (mouse) ───────────────────────────────────────────
+  canvasWrap.addEventListener('mousedown', e => {
+    drag = true;
+    dragStart = { x: e.clientX - offset.x, y: e.clientY - offset.y };
+    e.preventDefault();
+  });
+  window.addEventListener('mousemove', e => {
+    if (!drag) return;
+    offset.x = e.clientX - dragStart.x;
+    offset.y = e.clientY - dragStart.y;
+    draw();
+  });
+  window.addEventListener('mouseup', () => drag = false);
+
+  // ── drag (touch) ──────────────────────────────────────────
+  let lastTouchDist = null;
+  canvasWrap.addEventListener('touchstart', e => {
+    if (e.touches.length === 1) {
+      drag = true;
+      dragStart = { x: e.touches[0].clientX - offset.x, y: e.touches[0].clientY - offset.y };
+    }
+    if (e.touches.length === 2) {
+      drag = false;
+      lastTouchDist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+    }
+    e.preventDefault();
+  }, { passive: false });
+
+  canvasWrap.addEventListener('touchmove', e => {
+    if (e.touches.length === 1 && drag) {
+      offset.x = e.touches[0].clientX - dragStart.x;
+      offset.y = e.touches[0].clientY - dragStart.y;
+      draw();
+    }
+    if (e.touches.length === 2 && lastTouchDist !== null) {
+      const dist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      const delta = dist / lastTouchDist;
+      scale = Math.min(3, Math.max(0.5, scale * delta));
+      lastTouchDist = dist;
+      zoomSlider.value = Math.round(scale * 100);
+      draw();
+    }
+    e.preventDefault();
+  }, { passive: false });
+
+  canvasWrap.addEventListener('touchend', () => { drag = false; lastTouchDist = null; });
+
+  // ── scroll to zoom ────────────────────────────────────────
+  canvasWrap.addEventListener('wheel', e => {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? 0.93 : 1.07;
+    scale = Math.min(3, Math.max(0.5, scale * delta));
+    zoomSlider.value = Math.round(scale * 100);
+    draw();
+  }, { passive: false });
+
+  // ── zoom slider ───────────────────────────────────────────
+  zoomSlider.addEventListener('input', () => {
+    scale = parseInt(zoomSlider.value) / 100;
+    draw();
+  });
+
+  // ── reset ─────────────────────────────────────────────────
+  resetBtn.addEventListener('click', () => {
+    offset = { x: 0, y: 0 };
+    scale = 1;
+    zoomSlider.value = 100;
+    draw();
+  });
+
+  // ── download single ───────────────────────────────────────
+  dlSingle.addEventListener('click', () => {
+    const c = getFinalCanvas();
+    const a = document.createElement('a');
+    a.download = 'passport-photo.png';
+    a.href = c.toDataURL('image/png');
+    a.click();
+  });
+
+  // ── build print sheet ─────────────────────────────────────
+  dlSheet.addEventListener('click', () => {
+    const photo = getFinalCanvas();
+    sheetCanvas.width  = SHEET_W;
+    sheetCanvas.height = SHEET_H;
+    sCtx.fillStyle = '#fff';
+    sCtx.fillRect(0, 0, SHEET_W, SHEET_H);
+
+    const cellW = (SHEET_W - MARGIN * 2 - GAP * (COLS - 1)) / COLS;
+    const cellH = (SHEET_H - MARGIN * 2 - GAP * (ROWS - 1)) / ROWS;
+    const size  = Math.min(cellW, cellH);
+
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        const x = MARGIN + c * (size + GAP);
+        const y = MARGIN + r * (size + GAP);
+        sCtx.drawImage(photo, x, y, size, size);
+        // thin cut-guide border
+        sCtx.strokeStyle = '#ccc';
+        sCtx.lineWidth = 1;
+        sCtx.strokeRect(x, y, size, size);
+      }
+    }
+
+    // sheet preview (scaled)
+    sheetCanvas.style.maxHeight = '360px';
+    printSection.style.display = 'block';
+    dlSheetDl.style.display = 'flex';
+    printSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+
+  dlSheetDl.addEventListener('click', () => {
+    const a = document.createElement('a');
+    a.download = 'passport-sheet-4x6.png';
+    a.href = sheetCanvas.toDataURL('image/png');
+    a.click();
+  });
+
+})();
+</script>
+</body>
+</html>
