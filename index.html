@@ -348,7 +348,7 @@
       </button>
       <button class="btn-dl" id="dl-sheet">
         <span class="dl-title">Print Sheet</span>
-        <span class="dl-sub">4 × 6 in · 24 photos</span>
+        <span class="dl-sub">Landscape · 8 photos</span>
       </button>
       <button class="btn-dl" id="dl-sheet-dl" style="display:none">
         <span class="dl-title">↓ Save Sheet</span>
@@ -359,7 +359,7 @@
 
   <!-- STEP 4: Print sheet preview -->
   <div id="print-section">
-    <div class="step-label"><b>04</b> &nbsp;Print sheet preview — 24 photos on 4 × 6 in (Nigerian standard)</div>
+    <div class="step-label"><b>04</b> &nbsp;Print sheet preview — 8 photos · 4 × 2 landscape (Nigerian standard)</div>
     <canvas id="sheet-canvas"></canvas>
   </div>
 
@@ -381,8 +381,8 @@
   const DISPLAY_SIZE = 480;         // editor canvas display px
   const PREVIEW_SIZE = 160;         // preview canvas px
   // print sheet: 4×6 in @ 300dpi = 1200×1800, Nigerian standard flush grid
-  const SHEET_W = 1200, SHEET_H = 1800;
-  const COLS = 4, ROWS = 6;
+  const SHEET_W = 1800, SHEET_H = 900;
+  const COLS = 4, ROWS = 2;
   const MARGIN = 0;                 // flush edge to edge
   const GAP = 0;                    // no gaps between photos
 
