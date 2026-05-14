@@ -4,9 +4,6 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>PassportSnap</title>
-<link rel="icon" type="image/png" sizes="32x32" href="assets/favicon/32x32.png" />
-<link rel="icon" type="image/png" sizes="16x16" href="assets/favicon/16x16%20(1).png" />
-<link rel="icon" type="image/png" sizes="96x96" href="assets/favicon/96x96.png" />
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -298,7 +295,7 @@
 
   <header>
     <div class="logo">Passport<span>Snap</span></div>
-    <div class="tagline">US Standard · 2 × 2 in · Free · Private</div>
+    <div class="tagline">Nigerian Standard · Passport Photo · Free · Private</div>
   </header>
 
   <!-- STEP 1: Upload -->
@@ -351,28 +348,28 @@
       </button>
       <button class="btn-dl" id="dl-sheet">
         <span class="dl-title">Print Sheet</span>
-        <span class="dl-sub">4 × 6 in · 8 photos</span>
+        <span class="dl-sub">4 × 6 in · 24 photos</span>
       </button>
       <button class="btn-dl" id="dl-sheet-dl" style="display:none">
         <span class="dl-title">↓ Save Sheet</span>
-        <span class="dl-sub">1800 × 1200 px · PNG</span>
+        <span class="dl-sub">1200 × 1800 px · PNG</span>
       </button>
     </div>
   </div>
 
   <!-- STEP 4: Print sheet preview -->
   <div id="print-section">
-    <div class="step-label"><b>04</b> &nbsp;Print sheet preview — 8 photos on 4 × 6 in</div>
+    <div class="step-label"><b>04</b> &nbsp;Print sheet preview — 24 photos on 4 × 6 in (Nigerian standard)</div>
     <canvas id="sheet-canvas"></canvas>
   </div>
 
   <div class="tip">
-    <strong>Printing tip:</strong> When printing, set your printer to <strong>4 × 6 in</strong> photo paper and choose <em>"actual size"</em> (no scaling). Each photo will come out exactly 2 × 2 inches as required by the US State Department.
+    <strong>Printing tip:</strong> When printing, set your printer to <strong>4 × 6 in</strong> photo paper and choose <em>"actual size"</em> (no scaling). The sheet contains 24 flush passport photos in a 4 × 6 grid, matching the Nigerian passport photo standard.
   </div>
 
   <footer>
     <span>PassportSnap · runs entirely in your browser · no data uploaded</span>
-    <span>US 2×2 in standard</span>
+    <span>Nigerian passport standard</span>
   </footer>
 
 </div>
@@ -383,19 +380,11 @@
   const PASSPORT_PX = 600;          // output resolution
   const DISPLAY_SIZE = 480;         // editor canvas display px
   const PREVIEW_SIZE = 160;         // preview canvas px
-  // print sheet: 4×6 in @ 300dpi = 1200×1800
+  // print sheet: 4×6 in @ 300dpi = 1200×1800, Nigerian standard flush grid
   const SHEET_W = 1200, SHEET_H = 1800;
-  const MARGIN = 30;                // px inside sheet
-  const GAP = 20;
-  const MM_PER_INCH = 25.4;
-  const PRINT_DPI = 300;
-  const NG_PRINT_W_MM = 35;
-  const NG_PRINT_H_MM = 45;
-  const NG_DIGITAL_W_PX = 600;
-  const NG_DIGITAL_H_PX = 800;
-  const NG_BG = '#FFFFFF';
-  const NG_PRINT_W_PX = Math.round((NG_PRINT_W_MM / MM_PER_INCH) * PRINT_DPI);
-  const NG_PRINT_H_PX = Math.round((NG_PRINT_H_MM / MM_PER_INCH) * PRINT_DPI);
+  const COLS = 4, ROWS = 6;
+  const MARGIN = 0;                 // flush edge to edge
+  const GAP = 0;                    // no gaps between photos
 
   // ── state ──────────────────────────────────────────────────
   let img = null;
@@ -544,38 +533,6 @@
     return out;
   }
 
-  // Nigeria print crop (35×45mm, digital 600×800)
-  function getNigeriaPrintCanvas() {
-    const out = document.createElement('canvas');
-    out.width = NG_DIGITAL_W_PX;
-    out.height = NG_DIGITAL_H_PX;
-    const ctx = out.getContext('2d');
-
-    const s = baseScale * scale;
-    const iw = img.width * s;
-    const ih = img.height * s;
-    const cx = DISPLAY_SIZE / 2 + offset.x;
-    const cy = DISPLAY_SIZE / 2 + offset.y;
-    const ix = cx - iw / 2;
-    const iy = cy - ih / 2;
-
-    // Keep 35:45 aspect inside the square editor viewport.
-    const cropW = DISPLAY_SIZE * (NG_PRINT_W_MM / NG_PRINT_H_MM);
-    const cropH = DISPLAY_SIZE;
-    const cropX = (DISPLAY_SIZE - cropW) / 2;
-    const cropY = 0;
-
-    const sx = (cropX - ix) / s;
-    const sy = (cropY - iy) / s;
-    const sw = cropW / s;
-    const sh = cropH / s;
-
-    ctx.fillStyle = NG_BG;
-    ctx.fillRect(0, 0, NG_DIGITAL_W_PX, NG_DIGITAL_H_PX);
-    ctx.drawImage(img, sx, sy, sw, sh, 0, 0, NG_DIGITAL_W_PX, NG_DIGITAL_H_PX);
-    return out;
-  }
-
   // ── drag (mouse) ───────────────────────────────────────────
   canvasWrap.addEventListener('mousedown', e => {
     drag = true;
@@ -663,35 +620,26 @@
 
   // ── build print sheet ─────────────────────────────────────
   dlSheet.addEventListener('click', () => {
-    const photo = getNigeriaPrintCanvas();
+    const photo = getFinalCanvas();
     sheetCanvas.width  = SHEET_W;
     sheetCanvas.height = SHEET_H;
-    sCtx.fillStyle = NG_BG;
+    sCtx.fillStyle = '#fff';
     sCtx.fillRect(0, 0, SHEET_W, SHEET_H);
 
-    const usableW = SHEET_W - MARGIN * 2;
-    const usableH = SHEET_H - MARGIN * 2;
-    const cols = Math.max(1, Math.floor((usableW + GAP) / (NG_PRINT_W_PX + GAP)));
-    const rows = Math.max(1, Math.floor((usableH + GAP) / (NG_PRINT_H_PX + GAP)));
-    const gridW = cols * NG_PRINT_W_PX + (cols - 1) * GAP;
-    const gridH = rows * NG_PRINT_H_PX + (rows - 1) * GAP;
-    const startX = Math.round((SHEET_W - gridW) / 2);
-    const startY = Math.round((SHEET_H - gridH) / 2);
+    // Flush grid — divide sheet evenly, no margins or gaps
+    const cellW = Math.floor(SHEET_W / COLS);
+    const cellH = Math.floor(SHEET_H / ROWS);
 
-    for (let r = 0; r < rows; r++) {
-      for (let c = 0; c < cols; c++) {
-        const x = startX + c * (NG_PRINT_W_PX + GAP);
-        const y = startY + r * (NG_PRINT_H_PX + GAP);
-        sCtx.drawImage(photo, x, y, NG_PRINT_W_PX, NG_PRINT_H_PX);
-        // thin cut-guide border
-        sCtx.strokeStyle = '#ccc';
-        sCtx.lineWidth = 1;
-        sCtx.strokeRect(x, y, NG_PRINT_W_PX, NG_PRINT_H_PX);
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        const x = c * cellW;
+        const y = r * cellH;
+        sCtx.drawImage(photo, x, y, cellW, cellH);
       }
     }
 
     // sheet preview (scaled)
-    sheetCanvas.style.maxHeight = '360px';
+    sheetCanvas.style.maxHeight = '420px';
     printSection.style.display = 'block';
     dlSheetDl.style.display = 'flex';
     printSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
